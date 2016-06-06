@@ -1,3 +1,4 @@
+
 # Description
 This repository contains item-based collaborative filtering algorithm for implicit feedback.
 
@@ -5,5 +6,8 @@ This repository contains item-based collaborative filtering algorithm for implic
 ua.base is the training set, ua.test is the test set. They are downloaded from GroupLens official website.
 http://files.grouplens.org/datasets/movielens/
 
-# Metric
+# Metrics
 This algorithm is evaluated with precision and recall.
+
+# Requirement
+You need to download numpy to run this program.
