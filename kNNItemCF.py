@@ -83,7 +83,6 @@ class ItemCF:
         idcg = np.zeros((num_users))
         dcg  = np.zeros((num_users))
         ndcg = np.zeros((num_users))
-
         map = np.zeros((num_users))
 
         for i in np.arange(0,num_users):
@@ -99,19 +98,21 @@ class ItemCF:
                 recall = recall + len(hit_set) / (len(test_items_idx) * 1.0)
                 user_count = user_count + 1
 
-                # calculate the ndcg measure
+                # calculate the ndcg and map measure
                 if len(hit_set) != 0:
                     rel_list = np.zeros((len(rec_of_i)))
                     rank = 0.0 # to calculate the idcg measure
                     for item in hit_set:
+                        rec_of_i = list(rec_of_i)
                         item_rank = rec_of_i.index(item)    # relevant items in the rec_of_i, to calculate dcg measure
                         rel_list[item_rank] = 1
                         dcg[i] = dcg[i] + 1.0 / math.log(item_rank+2,2)
                         idcg[i] = idcg[i] + 1.0 / math.log(rank+2,2)
-                        map[i] = map[i] + (rank+1) / (item_rank + 2.0)
+                        map[i] = map[i] + (rank+1) / (item_rank + 1.0)
                         rank = rank + 1
-                ndcg[i] = dcg[i] / (idcg[i] * 1.0)
-                map[i] = map[i] / len(hit_set)
+                    ndcg[i] = dcg[i] / (idcg[i] * 1.0)
+                    map[i] = map[i] / len(hit_set)
+
         ndcg = sum(ndcg) / user_count
         map = sum(map) / user_count
         precision = precision / (user_count * 1.0)
@@ -122,9 +123,9 @@ class ItemCF:
 def test():
     kNN = [80]
     top_N = [5,10,15,20]
-    train = load_matrix('ua.base',943,1682)
-    test = load_matrix('ua.test',943,1682)
-    kNNItemCF = ItemCF(train,test)
+    train_data = load_matrix('ua.base',943,1682)
+    test_data = load_matrix('ua.test',943,1682)
+    kNNItemCF = ItemCF(train_data,test_data)
     kNNItemCF.ItemSimilarity()
     print "%10s %10s %20s%20s%20s%20s" % ('kNN','top_N',"precision",'recall','ndcg','map')
     for k in kNN:
