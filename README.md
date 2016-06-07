@@ -7,7 +7,7 @@ ua.base is the training set, ua.test is the test set. They are downloaded from G
 http://files.grouplens.org/datasets/movielens/
 
 # Metrics
-Both algorithms are evaluated with precision and recall.
+Both algorithms are evaluated with precision, recall, nDCG and map.
 
 # Requirement
 You need to download numpy to run this program.
