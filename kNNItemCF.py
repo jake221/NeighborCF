@@ -131,7 +131,7 @@ def test():
     for k in kNN:
         for N in top_N:
             precision,recall,ndcg,map = kNNItemCF.Evaluate(k,N)
-            print "%5d%5d%19.3f%%%19.3f%%" % (k,N,precision*100,recall*100,ndcg*100,map*100)
+            print "%5d%5d%19.3f%%%19.3f%%19.3f%%19.3f%%" % (k,N,precision*100,recall*100,ndcg*100,map*100)
 
 if __name__=='__main__':
     test()
