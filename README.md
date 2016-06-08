@@ -1,13 +1,21 @@
 
 # Description
-This repository contains user-based and item-based collaborative filtering algorithm for implicit feedback.
+
+## kNNItemCF.py: item-based collaborative filtering algorithm for implicit feedback data, evaluated by precision, recall, ndcg and map.
+## kNNUserCF.py: user-based collaborative filtering algorithm for implicit feedback data, evaluated by precision, recall, ndcg and map.
+## kNNItemCF.py: item-based collaborative filtering algorithm for implicit feedback data, evaluated by AUC.
+## map.py: map measure
+## ndcg.py ndcg measure
 
 # Data
-ua.base is the training set, ua.test is the test set. They are downloaded from GroupLens official website.
-http://files.grouplens.org/datasets/movielens/
+## ua.base is the training set
+## ua.test is the test set. 
+They are downloaded from GroupLens official website, http://files.grouplens.org/datasets/movielens/.
 
 # Metrics
-Both algorithms are evaluated with precision, recall, nDCG and map.
+kNNItemCF and kNNUserCF are evaluated by precision, recall, nDCG and map.
+kNNItemCF_AUC is evaluated by AUC.
+
 
 # Requirement
 You need to download numpy to run this program.
