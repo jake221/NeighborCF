@@ -1,0 +1,156 @@
+# coding : UTF-8
+# Please feel free to contact with me if you have any question with the code.
+__author__ = 'wangjinkun@mail.hfut.edu.cn'
+
+import numpy as np
+import time
+import math
+
+def load_matrix(filename, num_users, num_items):
+    t0 = time.time()
+    matrix = np.zeros((num_users,num_items))
+    for line in open(filename):
+        # user,item = line.split()
+        user,item,_,_ = line.split()
+        user = int(user)
+        item = int(item)
+        count = 1.0
+        matrix[user-1,item-1] = count
+    t1 = time.time()
+    print 'Finished loading matrix in %f seconds' % (t1-t0)
+    return  matrix
+
+class ItemCF:
+
+    def __init__(self,traindata,testdata):
+        self.traindata = traindata
+        self.testdata = testdata
+        self.num_users = traindata.shape[0]
+        self.num_items = traindata.shape[1]
+
+    def ItemSimilarity(self):
+        t0 = time.time()
+        train = self.traindata
+        num_items = self.num_items
+        self.item_similarity = np.zeros((num_items,num_items))
+
+        for i in np.arange(0,num_items):
+            r_i = train[:,i]
+            self.item_similarity[i,i] = 0
+            for j in np.arange(i+1,num_items):
+                r_j = train[:,j]
+                num = np.dot(r_i.T , r_j)
+                denom = np.linalg.norm(r_i) * np.linalg.norm(r_j)
+                if denom == 0:
+                    cos = 0
+                else:
+                    cos = num / denom
+                self.item_similarity[i,j] = cos
+                self.item_similarity[j,i] = cos
+        self.item_neighbor = np.argsort(-self.item_similarity)
+        t1 = time.time()
+        print 'Finished calculating similarity matrix in %f seconds' % (t1-t0)
+
+    # def Recommendation(self,user_id,kNN,top_N):
+    #     # recommend a top_N recommendation list for user_id
+    #     # r_ui = \sum_{j \in N^k(i)} r_uj \times w_ij
+    #     train = self.traindata
+    #     similarity = self.item_similarity
+    #
+    #     # find the user's rating history
+    #     r_u = train[user_id]
+    #     rated_items = np.nonzero(r_u)
+    #     rated_items_idx = rated_items[0]    # items rated by user_id in train set
+    #     predict_items_idx = np.setdiff1d(np.arange(0,self.num_items),rated_items_idx)   # item index that has to be predicted
+    #     pred_score = np.zeros((1,self.num_items))
+    #     for i in predict_items_idx:
+    #         item_idx = i
+    #         neighbor_ordered = self.item_neighbor[item_idx] #
+    #         for neigh in neighbor_ordered[0:kNN]:
+    #             pred_score[0,i] = pred_score[0,i] + train[user_id,neigh] * similarity[i,neigh]
+    #     rec_candidate = np.argsort(-pred_score)
+    #     rec_candidate_X = rec_candidate[0]
+    #     rec_list = rec_candidate_X[0:top_N]
+    #     return rec_list
+
+    def Prediction(self,user_id,item_id,kNN):
+        # predict the preference of a user for an item
+        train = self.traindata
+        similarity = self.item_similarity
+
+        # find the user's rating history
+        r_u = train[user_id]
+        rated_items = np.nonzero(r_u)
+        rated_items_idx = rated_items[0]    # items rated by user_id in train set
+
+        neighbor_ordered = self.item_neighbor[item_id] #
+        pred_score = 0
+        for neigh in neighbor_ordered[0:kNN]:
+            pred_score = pred_score + train[user_id,neigh] * similarity[item_id,neigh]
+        return pred_score
+
+    def EvaluateByAUC(self,kNN):
+        num_users = self.num_users
+        num_items = self.num_items
+        train = self.traindata
+        test = self.testdata
+
+        auc = np.zeros(num_users)
+        user_count = 0
+
+        for i in range(num_users):
+            r_test_i = test[i]
+            test_items = np.nonzero(r_test_i)
+            test_items_idx = test_items[0]
+            if len(test_items_idx) == 0:
+                continue
+            else:
+                r_train_i = train[i]
+                zero_idx = np.where(r_train_i == 0)
+                auc_item_idx = zero_idx[0]
+
+                true_pref = test[i,auc_item_idx]
+                pred_pref = np.zeros(len(auc_item_idx))
+                for item_id in range(len(pred_pref)):
+                    pred_pref[item_id] = self.Prediction(i,item_id,kNN)
+                auc[i] = self.CalcAuc(true_pref,pred_pref)
+                user_count = user_count + 1
+        AUC = sum(auc) / user_count
+        return AUC
+
+    def CalcAuc(self,true_pref,pred_pref):
+        result = []
+        n_false, n_truth = 0, 0
+        idx = 0
+        for y1_i in true_pref:
+            y2_i,idx = pred_pref[idx], idx+1
+            if y1_i > 0:
+                n_truth += 1
+            else:
+                n_false += 1
+            result.append((y2_i,y1_i))
+        sort_list = sorted(result,key=lambda d:d[0],reverse=True)
+        truth_of_truth, idx = 0, n_false
+        for k,v in sort_list:
+            if v > 0:
+                truth_of_truth += idx
+            else:
+                idx -= 1
+        AUC = truth_of_truth / (n_truth * n_false * 1.0)
+        return AUC
+
+def test():
+    kNN = [60,80,100,120,140]
+    train_data = load_matrix('ua.base',943,1682)
+    test_data = load_matrix('ua.test',943,1682)
+    # train_data = load_matrix('train_sample.txt',6,4)
+    # test_data = load_matrix('test_sample.txt',6,4)
+    kNNItemCF = ItemCF(train_data,test_data)
+    kNNItemCF.ItemSimilarity()
+    AUC = np.zeros(len(kNN))
+    for k in range(len(kNN)):
+        AUC[k] = kNNItemCF.EvaluateByAUC(kNN[k])
+        print "%5d%19.3f%%" % (kNN[k],AUC[k]*100)
+
+if __name__=='__main__':
+    test()
