@@ -32,12 +32,13 @@ class ItemCF:
         t0 = time.time()
         train = self.traindata
         num_items = self.num_items
-        self.item_similarity = np.zeros((num_items,num_items))
 
-        for i in np.arange(0,num_items):
+        self.item_similarity = np.zeros(num_items,num_items)
+
+        for i in range(num_items):
             r_i = train[:,i]
             self.item_similarity[i,i] = 0
-            for j in np.arange(i+1,num_items):
+            for j in range(i+1,num_items):
                 r_j = train[:,j]
                 num = np.dot(r_i.T , r_j)
                 denom = np.linalg.norm(r_i) * np.linalg.norm(r_j)
@@ -51,69 +52,42 @@ class ItemCF:
         t1 = time.time()
         print 'Finished calculating similarity matrix in %f seconds' % (t1-t0)
 
-    # def Recommendation(self,user_id,kNN,top_N):
-    #     # recommend a top_N recommendation list for user_id
-    #     # r_ui = \sum_{j \in N^k(i)} r_uj \times w_ij
-    #     train = self.traindata
-    #     similarity = self.item_similarity
-    #
-    #     # find the user's rating history
-    #     r_u = train[user_id]
-    #     rated_items = np.nonzero(r_u)
-    #     rated_items_idx = rated_items[0]    # items rated by user_id in train set
-    #     predict_items_idx = np.setdiff1d(np.arange(0,self.num_items),rated_items_idx)   # item index that has to be predicted
-    #     pred_score = np.zeros((1,self.num_items))
-    #     for i in predict_items_idx:
-    #         item_idx = i
-    #         neighbor_ordered = self.item_neighbor[item_idx] #
-    #         for neigh in neighbor_ordered[0:kNN]:
-    #             pred_score[0,i] = pred_score[0,i] + train[user_id,neigh] * similarity[i,neigh]
-    #     rec_candidate = np.argsort(-pred_score)
-    #     rec_candidate_X = rec_candidate[0]
-    #     rec_list = rec_candidate_X[0:top_N]
-    #     return rec_list
-
-    def Prediction(self,user_id,item_id,kNN):
+    def ItemCFPrediction(self,user_id,item_id,kNN):
         # predict the preference of a user for an item
+        pred_score = 0
         train = self.traindata
         similarity = self.item_similarity
 
-        # find the user's rating history
-        r_u = train[user_id]
-        rated_items = np.nonzero(r_u)
-        rated_items_idx = rated_items[0]    # items rated by user_id in train set
-
-        neighbor_ordered = self.item_neighbor[item_id] #
-        pred_score = 0
-        for neigh in neighbor_ordered[0:kNN]:
-            pred_score = pred_score + train[user_id,neigh] * similarity[item_id,neigh]
+        neigh_of_item = self.item_neighbor[item_id]
+        neigh = neigh_of_item[0:kNN]
+        for neigh_item in neigh:
+            pred_score = pred_score + train[user_id,neigh_item] * similarity[item_id,neigh_item]
         return pred_score
 
     def EvaluateByAUC(self,kNN):
         num_users = self.num_users
-        num_items = self.num_items
         train = self.traindata
         test = self.testdata
 
         auc = np.zeros(num_users)
         user_count = 0
 
-        for i in range(num_users):
-            r_test_i = test[i]
+        for u in range(num_users):
+            r_test_i = test[u]
             test_items = np.nonzero(r_test_i)
             test_items_idx = test_items[0]
-            if len(test_items_idx) == 0:
+            if len(test_items_idx) == 0:    # if this user does not possess any rating in the test set, skip the evaluate procedure
                 continue
             else:
-                r_train_i = train[i]
+                r_train_i = train[u]
                 zero_idx = np.where(r_train_i == 0)
                 auc_item_idx = zero_idx[0]
 
-                true_pref = test[i,auc_item_idx]
+                true_pref = test[u,auc_item_idx]
                 pred_pref = np.zeros(len(auc_item_idx))
                 for item_id in range(len(pred_pref)):
-                    pred_pref[item_id] = self.Prediction(i,item_id,kNN)
-                auc[i] = self.CalcAuc(true_pref,pred_pref)
+                    pred_pref[item_id] = self.ItemCFPrediction(u,item_id,kNN)
+                auc[u] = self.CalcAuc(true_pref,pred_pref)
                 user_count = user_count + 1
         AUC = sum(auc) / user_count
         return AUC
