@@ -33,10 +33,10 @@ class ItemCF:
         num_items = self.num_items
         self.item_similarity = np.zeros((num_items,num_items))
 
-        for i in np.arange(0,num_items):
+        for i in range(num_items):
             r_i = train[:,i]
             self.item_similarity[i,i] = 0
-            for j in np.arange(i+1,num_items):
+            for j in range(i+1,num_items):
                 r_j = train[:,j]
                 num = np.dot(r_i.T , r_j)
                 denom = np.linalg.norm(r_i) * np.linalg.norm(r_j)
@@ -50,68 +50,71 @@ class ItemCF:
         t1 = time.time()
         print 'Finished calculating similarity matrix in %f seconds' % (t1-t0)
 
-    def Recommendation(self,user_id,kNN,top_N):
-        # recommend a top_N recommendation list for user_id
+    def ItemCFPrediction(self,user_id,item_id,kNN):
+        # predict the preference of a user for an item using kNN item-based collaborative filtering
         # r_ui = \sum_{j \in N^k(i)} r_uj \times w_ij
+        pred_score = 0
+
         train = self.traindata
         similarity = self.item_similarity
 
         # find the user's rating history
-        r_u = train[user_id]
-        rated_items = np.nonzero(r_u)
-        rated_items_idx = rated_items[0]    # items rated by user_id in train set
-        predict_items_idx = np.setdiff1d(np.arange(0,self.num_items),rated_items_idx)   # item index that has to be predicted
-        pred_score = np.zeros((1,self.num_items))
-        for i in predict_items_idx:
-            item_idx = i
-            neighbor_ordered = self.item_neighbor[item_idx] #
-            for neigh in neighbor_ordered[0:kNN]:
-                pred_score[0,i] = pred_score[0,i] + train[user_id,neigh] * similarity[i,neigh]
-        rec_candidate = np.argsort(-pred_score)
-        rec_candidate_X = rec_candidate[0]
-        rec_list = rec_candidate_X[0:top_N]
-        return rec_list
+        neigh_of_item = self.item_neighbor[item_id]
+        neigh = neigh_of_item[0:kNN]
+        for neigh_item in neigh:
+            pred_score = pred_score + train[user_id,neigh_item] * similarity[item_id,neigh_item]
+        return pred_score
 
     def Evaluate(self,kNN,top_N):
-        test = self.testdata
-        num_users = self.num_users
-
         precision = 0
         recall = 0
         user_count = 0
 
-        idcg = np.zeros((num_users))
-        dcg  = np.zeros((num_users))
-        ndcg = np.zeros((num_users))
-        map = np.zeros((num_users))
+        train = self.traindata
+        test = self.testdata
+        num_users = self.num_users
+        num_items = self.num_items
 
-        for i in np.arange(0,num_users):
-            r_i = test[i]
-            test_items = np.nonzero(r_i)
+        idcg = np.zeros(num_users)
+        dcg  = np.zeros(num_users)
+        ndcg = np.zeros(num_users)
+        map = np.zeros(num_users)
+
+        for u in range(num_users):
+            r_u_test = test[u]
+            test_items = np.nonzero(r_u_test)
             test_items_idx = test_items[0]
-            if len(test_items_idx) == 0:    # if this user does not possess rating in the test set, skip the evaluate procedure
+            if len(test_items_idx) == 0:    # if this user does not possess any rating in the test set, skip the evaluate procedure
                 continue
             else:
-                rec_of_i = self.Recommendation(i,kNN,top_N)
-                hit_set = np.intersect1d(rec_of_i,test_items_idx)
+                r_u_train = train[u]
+                train_items = np.nonzero(r_u_train)
+                train_items_idx = train_items[0]    # items user u rated in the train data set, which we do not need to predict
+                pred_item_idx = np.setdiff1d(range(num_items),train_items_idx)
+                pred_sore = np.zeros(num_items)
+                for item in pred_item_idx:
+                    pred_sore[item] = self.ItemCFPrediction(u,item,kNN)
+                rec_cand = np.argsort(-pred_sore)
+                rec_list = rec_cand[0:top_N]
+                hit_set = np.intersect1d(rec_list,test_items_idx)
                 precision = precision + len(hit_set) / (top_N * 1.0)
                 recall = recall + len(hit_set) / (len(test_items_idx) * 1.0)
                 user_count = user_count + 1
 
                 # calculate the ndcg and map measure
                 if len(hit_set) != 0:
-                    rel_list = np.zeros((len(rec_of_i)))
+                    rel_list = np.zeros((len(rec_list)))
                     rank = 0.0 # to calculate the idcg measure
                     for item in hit_set:
-                        rec_of_i = list(rec_of_i)
+                        rec_of_i = list(rec_list)
                         item_rank = rec_of_i.index(item)    # relevant items in the rec_of_i, to calculate dcg measure
                         rel_list[item_rank] = 1
-                        dcg[i] = dcg[i] + 1.0 / math.log(item_rank+2,2)
-                        idcg[i] = idcg[i] + 1.0 / math.log(rank+2,2)
-                        map[i] = map[i] + (rank+1) / (item_rank + 1.0)
+                        dcg[u] = dcg[u] + 1.0 / math.log(item_rank+2,2)
+                        idcg[u] = idcg[u] + 1.0 / math.log(rank+2,2)
+                        map[u] = map[u] + (rank+1) / (item_rank + 1.0)
                         rank = rank + 1
-                    ndcg[i] = dcg[i] / (idcg[i] * 1.0)
-                    map[i] = map[i] / len(hit_set)
+                    ndcg[u] = dcg[u] / (idcg[u] * 1.0)
+                    map[u] = map[u] / len(hit_set)
 
         ndcg = sum(ndcg) / user_count
         map = sum(map) / user_count
@@ -127,7 +130,7 @@ def test():
     test_data = load_matrix('ua.test',943,1682)
     kNNItemCF = ItemCF(train_data,test_data)
     kNNItemCF.ItemSimilarity()
-    print "%10s %10s %20s%20s%20s%20s" % ('kNN','top_N',"precision",'recall','ndcg','map')
+    print "%7s %7s %20s%20s%20s%20s" % ('kNN','top_N',"precision",'recall','ndcg','map')
     for k in kNN:
         for N in top_N:
             precision,recall,ndcg,map = kNNItemCF.Evaluate(k,N)
